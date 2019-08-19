@@ -1,0 +1,205 @@
+﻿Ubuntu 18.04에서 uWSGI 및 Nginx로 플라스크 설치하기 -> 아마존 aws 우분투에 설치중
+
+Step 1 — ubuntu Repositories 구성요소 설치
+
+apt update 및 python 설치
+- sudo apt update
+- sudo apt install python3-pip python3-dev build-essential libssl-dev libffi-dev python3-setuptools
+
+Step 2 — 파이썬 가상 환경 만들기
+
+python-venv 모듈 설치
+- sudo apt install python3-venv
+
+가상 디렉토리 생성
+- mkdir ~/myproject
+- cd ~/myprojec
+
+파이썬 가상환경 설정
+- python3.6 -m venv myprojectenv
+
+가상 환경 내에 응용 프로그램을 설치하기 전에 활성화
+- source myprojectenv/bin/activate
+
+Step 3 — flask 응용 프로그램 설정
+
+wheel 설치
+- pip install wheel
+
+uwsqi flask 설치
+- pip install uwsgi flask
+
+myproject.py 파일 생성
+--------------------------------------------------------------------
+from flask import Flask
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "<h1 style='color:blue'>Hello There!</h1>"
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0')
+--------------------------------------------------------------------
+포트 5000에 대한 엑세스 허용
+- sudo ufw allow 5000
+
+//오류가 나는 경우
+aws 서버 ip를 동적으로 할당(탈력적 ip)
+-> 5000포트를 aws에 등록해야함
+
+myproject 파일 실행, flask 실행 확인
+- python myproject.py 
+
+* Serving Flask app "myproject" (lazy loading)
+ * Environment: production
+   WARNING: Do not use the development server in a production environment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+ * Running on http://0.0.0.0:5000/ (Press CTRL+C to quit)
+ -> http://서버주소(54.92.84.119):5000
+
+Step 4 — uWSGI 구성
+
+wsgi 파일 생성
+--------------------------------------------------------------------
+from myproject import app
+
+if __name__ == "__main__":
+    app.run()
+--------------------------------------------------------------------
+wsgi 진입 포인트로 사용할 파일 생성( uWSGI 서버와의 상호 작용)
+
+uWSGI가 응용 프로그램을 제공할 수 있는지 테스트
+wsgi:app  -> 경로
+소켓을 지정하여 프로토콜뿐만 아니라 공개적으로 사용 가능한
+인터페이스에서 시작 되도록하여 uWSGI 이진 프로토콜 대신 HTTP를 사용
+uwsgi --socket 0.0.0.0:5000 --protocol=http -w wsgi:app
+- > http://54.92.84.119:5000/ 로 들어가서 확인
+
+---------------------- 가상 환경 설정 완료 ----------------------
+
+비활성화
+- deactivate
+uWSGI 구성 파일 작성
+- nano ~/myproject/myproject.ini
+
+uWSGI가 설정을 정용할 수 있도록 내부에서 [uwsgi]헤더로 시작
+- wsgi.py 파이리에서 모듈 참조
+- 모듈 자체와 app 내에서 app 내에서 호출 가능한 두가지를 지정
+	[uwsgi]
+	module = wsgi:app
+
+- 실제 요청을 처리하기 위해 5개의 작업자 프로세스를 생성하도록 지시
+	master = true
+	processes = 5
+//ini 확장자 : 각종 프로그램들의 환경 설정 파일
+
+- Unix 소켓이 더 빠르고 안전함으로 소켓 myproject.sock을 호출하여이 디렉토리에 배치
+- 소켓 권한 변경 -> uWSGI 프로세스에 대한 Nginx 그룹 소유권을 제공
+		소켓의 그룹 소유자가 정보를 읽고 쓸 수 있도록 변경
+- 진공 옵션(?)을 추가하여 프로세스가 중지되면 소켓 정리
+
+	socket = myproject.sock
+	chmod-socket = 660
+	vacuum = true
+- die-on-term 옵션 설정
+- init 시스템과 uWSGI가 각 프로세스 신호의 의미에 대해 동일한 가정을 갖도록 보장
+- 이를 설정하면 두 시스템 구성 요소가 정렬되어 예상되는 동작이 구현됨
+
+- uWSGI는 다른 서버와 통신하도록 설계된 빠른 이진 프로토콜
+- Nginx는 이 프로토콜을 기본적으로 사용할 수 있음으로  HTTP로 통신하는 것보다
+	이 프로토콜을 사용하는 것이 좋습니다.
+
+Step 5 — 시스템 파일 단위 작성
+- systemd service unit 파일생성
+- 이를 만들면 Ubuntu의 초기화 시스템이 자동으로 uWSGI를 시작하고 
+서버가 부팅 될 때마다 Flask 응용 프로그램을 제공 가능
+
+ - 파일 /etc/systemd/system/myproject.service
+- unit 섹션을 열어 서비스에 대한 설명을 넣고 init 시스템에게 네트워킹 목표에 도달한 후 시작(??
+	[Unit]
+	Description=uWSGI instance to serve myproject
+	After=network.target
+- Service 섹션을 열어 프로세스를 실행 할 사용자 및 그룹을 지정
+- 프로세스에 관련된 모든 파일을 소유하고 있기 때문에 프로세스에 대한 일반 사용자 계정 소유권을 부여
+- Nginx가 uWSGI 프로세스와 쉽게 통신 할 수 있도록 www-data 그룹에 그룹 소유권을 부여\
+	[Service]
+	User=sammy(-> ubuntu로 바꿧음)
+	Group=www-data
+- 작업 디첵토리를 매핑하고 PATH 환경 변수를 설정 하여 init 시스템이 프로세스의 실행 파일이 가상 환경 내에 있음을 알림
+- 서비스를 시작하기 위한 명령을 지정
+- Systemd는 가상 환경 내에 설치된 uWSGI 실행 파일의 전체 경로를 제공
+- 프로젝트 디렉토리에 생성 한 .ini 구성 파일의 이름을 전달
+
+	WorkingDirectory=/home/sammy/myproject
+	Environment="PATH=/home/sammy/myproject/myprojectenv/bin"
+	ExecStart=/home/sammy/myproject/myprojectenv/bin/uwsgi --ini myproject.ini
+
+-Instll 섹션 추가
+- 부팅할 때 서비스를 시작하면 시스템에 서비스를 연결할 항목을 알려줌
+- 일반 다중 사용자 시스템이 시작되어 실행될 때이 서비스를 시작하려고 함
+
+	[Install]
+	WantedBy=multi-user.target
+
+uWSGI 서비스를 시작하고 부팅시 시작되도록 활성화 
+- sudo systemctl start myproject
+- sudo systemctl enable myproject
+
+상태 확인
+- sudo systemctl status myproject
+active (running)상태 여야함
+
+Step 6 — 프록시 요청을 위한 Nginx 구성
+- uwsgi 프로토콜을 사용하여 웹 요청을 해당 소켓에 전달하도록 Nginx를 구성
+- Nginx의 사이트에서 사용 가능한 디렉토리에 새 서버 블록 구성 파일을 작성
+- sudo nano /etc/nginx/sites-available/myproject
+
+- 서버 블록을 열고 Nginx에 기본 포트 80을 수신하도록 지시
+- 서버의 도메인 이름 요청에 이 블록을 사용 하도록 지시
+
+server {
+    listen 80;
+    server_name your_domain www.your_domain;
+}
+
+- uWSGI 매개 변수를 지정하는 uwsgi_params 파일이 포함
+- uwsgi_pass 지시문을 사용하여 정의한 소켓으로 요청을 전달
+
+server{
+   listen 80;
+    server_name your_domain www.your_domain;
+
+    location / {
+        include uwsgi_params;
+        uwsgi_pass unix:/home/sammy/myproject/myproject.sock;
+    }
+}
+
+- Nginx 서버 블록 구성을 활성화하려면 파일을 sites-enabled 디렉토리에 연결
+- sudo ln -s /etc/nginx/sites-available/myproject /etc/nginx/sites-enabled
+// nginx은 비동기 처리 방식의  웹서버로
+1. 정적 파일을 처리하는 http 서버로서의 역할
+2. 응용프로그램 서버에 요청을 보내는 리버스 프록시로서의 역할
+//클라이언트는 가짜 서버에 요청(request)하면, 프록시 서버가 배후 서버(reverse server)로부터 데이터를 가져오는 역할
+// 없으면 설치 해줘야함 sudo apt-get install nginx
+
+- 오류 테스트
+- sudo nginx -t
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+
+- nginx 리스타트
+sudo systemctl restart nginx
+
+- 방화벽 조정 
+- 5000을 통한 액세트가 필요하지 않으므로 해당 규칙 제거
+- sudo ufw delete allow 5000
+- sudo ufw allow 'Nginx Full'
+
+============================================
+오류남->sudo journalctl -u nginx로 확인
+ nginx.service: Failed to parse PID from file /run/nginx.pid: Invalid argument
+nginx status 와 run/nginx.conf? 와의 pid는 동일 
+무슨 오류인지 모르것음..ㅜㅜ
+https://bugs.launchpad.net/ubuntu/+source/nginx/+bug/1581864
