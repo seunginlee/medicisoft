@@ -1,0 +1,56 @@
+MongoDB 4.2 Community Edition 설치
+
+
+1. 패키지 관리 시스템에서 사용하는 공개 키 가져오기
+wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -
+
+OK
+
+2.MongoDB의 목록 파일을 작성
+echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.2.list
+
+3. apt-get update
+sudo apt-get update
+
+4. 몽고db 패키지 설치
+(혹시 몰라서4.2.0으로 맞춤)
+sudo apt-get install -y mongodb-org=4.2.0 mongodb-org-server=4.2.0 mongodb-org-shell=4.2.0 mongodb-org-mongos=4.2.0 mongodb-org-tools=4.2.0
+
+#아마도? 몽고db 패키지 고정하는것 같음
+echo "mongodb-org hold" | sudo dpkg --set-selections
+echo "mongodb-org-server hold" | sudo dpkg --set-selections
+echo "mongodb-org-shell hold" | sudo dpkg --set-selections
+echo "mongodb-org-mongos hold" | sudo dpkg --set-selections
+echo "mongodb-org-tools hold" | sudo dpkg --set-selections
+
+# 몽고db Community Edition 실행
+-> 몽고db 프로세스를 실행하는 사용자를 변경하는 경우 데이터 및 로그 디렉토리에 대한 권한도 수정하여이 사용자에게 해당 디렉토리에 대한 액세스 권한을 부여해야함
+
+1. 몽고db 실행
+sudo service mongod start
+
+2.몽고db의 성공되었는지 확인
+/var/log/mongodb/mongod.log 파일에서 [initandlisten] waiting for connections on port 27017 가 있으면 ok
+
+3. 몽고db 종료
+sudo service mongod stop
+
+4. 몽고db 재시작
+sudo service mongod restart
+
+5.몽고db 사용 ~
+mongo
+
+///////////////////////////////////////////////////////////////////////////
+		    지우는 방법
+///////////////////////////////////////////////////////////////////////////
+
+1. 몽고db 정지
+sudo service mongod stop
+
+2.몽고db 패키지 지우기
+sudo apt-get purge mongodb-org*
+
+3.데이터 디렉토리 지우기
+sudo rm -r /var/log/mongodb
+sudo rm -r /var/lib/mongodb
