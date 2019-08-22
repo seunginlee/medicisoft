@@ -1,0 +1,104 @@
+sudo service mongod restart 
+#		    start  몽고db 실행
+mongo 
+#리눅스 실행 명령어
+#mongo -u reco -p reco1234
+# 최고 권한 : reco
+
+db
+#현재 사용하는 데이터베이스 보여줌
+
+use db명
+#use mongo_test
+# 데이터 베이스 생성
+
+show dbs
+#생성한 db 목록 확인
+#리스트에서 방금 만든 데이터베이스를 보려면 최소 한개의 Document를 추가 해야 명령어로 확인 가능함
+
+(use db명 인 상태에서)
+db.dropDatabase()
+#데이터베이스 삭제
+
+db.createCollection(name,{option})
+#Collection 생성
+
+Field	Type	설명
+capped	Boolean	이 값을 true 로 설정하면 capped collection 을 활성화 시킵니다. Capped collection 이란, 고정된 크기(fixed size) 를 가진 컬렉션으로서, size 가 초과되면 가장 오래된 데이터를 덮어씁니다. 이 값을 true로 설정하면 size 값을 꼭 설정해야합니다.
+autoIndex	Boolean	이 값을 true로 설정하면, _id 필드에 index를 자동으로 생성합니다. 기본값은 false 입니다.
+size	number	Capped collection 을 위해 해당 컬렉션의 최대 사이즈(maximum size)를 ~ bytes로 지정합니다.
+max	number	해당 컬렉션에 추가 할 수 있는 최대 갯수를 설정합니다.
+
+#use mongo_test
+#db.createCollection("book")
+#db.createCollection("book",{capped : true, size : 1000})
+
+db.collection_name.drop()
+#db.book.drop()
+#collection 지우기
+
+db.collection_name.insert({"a" : "b"});
+#db.book.insert({"a":"b"})
+#collection 삽입하기
+#{"a":"b"} => 이 값들이 document값이 됨
+
+db.collection_name.remove
+#db.book.remove
+#document값 지우기
+#capped가 씌워진 collection인경우 지워지지 않음
+
+
+db.collection_name.find({"key" : "value"})
+#db.book.find() -> 전체 조회
+#db 조회
+
+#비교 연산을 이용한 document 조회
+#db.collection_name.find({"key":{비교연산자 : 비교할 수치 }}).pretty()
+##두개 이상의 연산자를 함께 쓰는 경우
+#db.collection_name.find({ $and: [{ "key":"value"}, {"key": {비교연산자 :  비교할 수치 }} ] })
+## 	비교 연산자 		설명
+	$eq(equals)		주어진 값고 일치하는 값
+	$gt(greater than)		주어진 값보다 큰 값
+	$gte(greater than or eq)	주어진 값보다 크거나 같은값
+	$lt(less than)		주어진 값보다 작은
+	$lte(less than or eq)		주어진 값보다 작거나 같은 값
+	$ne(not equal)		주어진 값과 일치하지 않는 값
+	$in			주어진 배열 안에 속하는 값
+	$nin(not in)		주어진 배열 안에 속하지 않는 값
+
+#데이터 정렬 
+#db.collection_name.find().sort({"key":오름/내림})
+#			   1이면 오름 -1 내림
+
+{"_id" : 1, "item" : { "category" : "cake", "type" : "chiffon" }, "amount" : 10 }
+{"_id" : 2, "item" : { "category" : "cookies", "type" : "chocolate chip" }, "amount" : 50 }
+{"_id" : 3, "item" : { "category" : "cookies", "type" : "chocolate chip" }, "amount" : 15 }
+{"_id" : 4, "item" : { "category" : "cake", "type" : "lemon" }, "amount" : 30 }
+
+##정형/비정형 정리할것
+정형 : 고정된 컬럼에 저장되는 데이터와 파일, 그리고 지정된 행과 열에 의해 데이터의 속성이 구별되는 스프레드시트 형태의 데이터
+	데이터의 스키마를 지원하는 것
+반정형 : 데이터 내부에 정형데이터의 스키마에 해당되는 메타데이터를 갖고 있으며. 일반적으로 파일 형태로 저장
+	-> mongoDB는 여기에 속하는것 같음
+비정형 : 데이터 세트가 아닌 하나의 데이터가 수집 데이터로 객체화
+	언어 분석이 가능한 텍스트 데이터나 이미지, 동영상 같은 멀티미디어 데이터가 대표적인 비정형 데이터
+
+#db.collection_name.distinct('key')
+#collection 내의 주어진 key의 고유한 값을 반환함
+
+#db.collection_name.findOne()
+#limit 1과 같음 객체 한개만 보고 싶을때 사용
+#db.collection_name.count()
+#collection 내의 문서의 수를(개수)를 반환
+#db.collection_name.ensureIndex()
+# 자주 조회되는 필드를 따로 저장해서 조회 밑 정렬 시의 속도를 빠르게 하는 기법
+#인댁스 생성 name: { first: 'Zero', last: 'Cho' } } -> createIndex({ 'name.last': 1 }); 
+#필드 별칭? 생성하는것 
+#db.collection_name.getIndexes()
+#인덱스 검색
+#db.collection_name.dropIndex( { KEY: 1 } )
+# 인덱스 삭제
+#db.collection_name.find().explain()
+#쿼리가 사용한 인덱스를 찾아줌?)
+#db.collection_name.update()
+#collection 값 수정(or 추가)
